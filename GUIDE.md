@@ -208,8 +208,7 @@ never saw in training (about 10,000 wrong first phones in all), when the first p
 | in the top 3 | 70 % | 60 % | 48 % | 42 % |
 | in the top 5 | 79 % | 70 % | 59 % | 53 % |
 
-So when you correct a phone, look at `top2` and `top3` first. The report (`--report`) shows the
-same figures as a chart.
+So when you correct a phone, look at `top2` and `top3` first.
 
 The model hears standard French phones. It does not mark diacritics or non-native or
 pathological variants.

@@ -242,10 +242,6 @@ def test_end_to_end():
         assert sum(c["T"] for c in data["chunks"]) > 0.9 * dur / data["hop"]
         idx = json.loads(re.search(r"const D = (\{.*?\});\n", open(f"{res}/index.html", encoding="utf-8").read()).group(1))
         assert [x["name"] for x in idx["rows"]] == ["rec"] and idx["failed"][0][0] == "damaged.wav", idx
-        for f in ("rec.html", "index.html"):                   # the candidates chart, filled in
-            html_ = open(f"{res}/{f}", encoding="utf-8").read()
-            assert "How useful are the candidates?" in html_ and "__ROWS__" not in html_ and "__RANKS__" not in html_, f
-            assert html_.count('class="rk-row"') == 4 and "top 5 <b>79 %</b>" in html_, f
         # --reference: a reference TextGrid for rec (the transcription's own phones, the first one
         # changed), comparison.csv, the reference in the page and the index; a reference that the
         # results would overwrite is refused
