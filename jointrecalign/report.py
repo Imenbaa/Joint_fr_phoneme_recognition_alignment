@@ -7,7 +7,8 @@ A recording's page shows, on one time axis that scrolls and zooms:
   attention   the aligner's log attention over the recognised phones and SIL,
               with the SIL-Viterbi path (where the boundaries come from),
   posteriors  the CTC log posterior of every vocabulary symbol per frame, and P(blank),
-  top 5       the five most probable symbols of each frame, by rank (from the unclipped posteriors).
+  top 5       the five most probable symbols of each frame, by rank (from the unclipped posteriors),
+and a chart of how often the right phone is among the candidates (RANKS; also in the index).
 With a reference (reference.py), the reference phones and pauses are drawn on every
 panel and each recognised phone is marked as matching, substituted or inserted.
 
@@ -36,6 +37,15 @@ ORDER = ["a", "e", "ɛ", "i", "o", "ɔ", "u", "y", "ø", "9", "ə",      # oral 
          "m", "n", "ɲ", "ŋ",                                         # nasals
          "l", "ʁ"]                                                   # liquids
 CLASS_START = ["@", "j", "p", "f", "m", "l"]
+# where the right phone is among the candidates when the 1st one is wrong, measured with the
+# released model against reference phone transcriptions (GUIDE.md, "How far to trust the
+# candidates"): kind of speech, number of wrong 1st phones, % 2nd / 3rd / 4th / 5th / not in the top 5
+RANKS = [("speech like the model's training data", 2206, (57.0, 12.8, 6.0, 2.7, 21.5)),
+         ("spontaneous conversation", 3850, (49.1, 10.5, 6.0, 4.0, 30.4)),
+         ("speech-assessment tasks", 1531, (38.5, 9.1, 7.5, 4.0, 40.8)),
+         ("dysarthric speakers and controls", 2457, (29.1, 12.9, 5.7, 4.9, 47.5))]
+RANKS_SOURCE = ("Measured on 4 kinds of French speech the model never saw in training, against reference "
+                "phone transcriptions: about 10,000 wrong 1st phones in all.")
 
 
 def _b64(a):
@@ -137,6 +147,25 @@ def _template(name):
         return f.read()
 
 
+def ranks_html():
+    """The "How useful are the candidates?" chart (RANKS), shared by the pages and the index."""
+    names = ("2nd", "3rd", "4th", "5th", "not in the top 5")
+    pc = lambda v: f"{int(v + 0.5)} %"                  # halves up, as in GUIDE.md
+    rows = []
+    for kind, n, pct in RANKS:
+        segs = "".join(
+            f'<span style="flex:0 1 {v}%;background:var(--{c});color:var(--{c}-ink)" '
+            f'title="{html.escape(kind)}: {nm} in {v:.1f} % of the wrong 1st phones">{pc(v) if v >= 6 else ""}</span>'
+            for v, nm, c in zip(pct, names, ("r2", "r3", "r4", "r5", "r0")))
+        top3, top5 = sum(pct[:2]), sum(pct[:4])
+        rows.append(f'<div class="rk-row"><div class="rk-name">{html.escape(kind)}<small>{n:,} wrong 1st phones</small></div>'
+                    f'<div class="rk-bar" role="img" aria-label="{html.escape(kind)}: 2nd {pc(pct[0])}, top 3 {pc(top3)}, '
+                    f'top 5 {pc(top5)}">{segs}</div>'
+                    f'<div class="rk-tot">top 3 <b>{pc(top3)}</b><br>top 5 <b>{pc(top5)}</b></div></div>')
+    return (_template("ranks.html").replace("<!--__ROWS__-->", "\n".join(rows))
+            .replace("__SOURCE__", html.escape(RANKS_SOURCE)))
+
+
 def _audio_ref(audio_path, out_dir):
     try:
         return os.path.relpath(os.path.abspath(audio_path), os.path.abspath(out_dir)).replace(os.sep, "/")
@@ -152,7 +181,7 @@ def write_page(path, audio_path, phones, pauses, dur, trace, tok, symbol_map, co
                      trace, tok, symbol_map, comparison)
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     page = (_template("page.html").replace("__TITLE__", html.escape(name))
-            .replace("/*__DATA__*/null", js))
+            .replace("<!--__RANKS__-->", ranks_html()).replace("/*__DATA__*/null", js))
     with open(path, "w", encoding="utf-8") as f:
         f.write(page)
 
@@ -191,4 +220,4 @@ def write_index(path, rows, failed=(), total=None):
                                              for k in ("PER", "F1@20", "MedianBE", "pause_F1")}}
     js = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     with open(path, "w", encoding="utf-8") as f:
-        f.write(_template("index.html").replace("/*__DATA__*/null", js))
+        f.write(_template("index.html").replace("<!--__RANKS__-->", ranks_html()).replace("/*__DATA__*/null", js))

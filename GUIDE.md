@@ -195,9 +195,21 @@ For each recording `name.wav`, the results folder holds:
 - with `--report`: `name.html` and `index.html` (see above);
 - `JointRecAlign.log`: the summary of the run.
 
-Read the probabilities with care: they are not calibrated. The first phone is often given
-about 0.99 even when it is wrong; but the **order** of the candidates is informative: when the
-first phone is wrong, the right one is often 2nd or 3rd.
+### How far to trust the candidates
+
+The probabilities are the model's own: the first phone is usually given 0.99 or more, even when it
+is wrong, so do not read them as percentages. What is informative is the **order** of the
+candidates. Compared with reference phone transcriptions of 4 kinds of French speech the model
+never saw in training (about 10,000 wrong first phones in all), when the first phone is wrong:
+
+| the right phone is... | speech like the training data | spontaneous conversation | speech-assessment tasks | dysarthric speakers and controls |
+|---|---|---|---|---|
+| 2nd | 57 % | 49 % | 39 % | 29 % |
+| in the top 3 | 70 % | 60 % | 48 % | 42 % |
+| in the top 5 | 79 % | 70 % | 59 % | 53 % |
+
+So when you correct a phone, look at `top2` and `top3` first. The report (`--report`) shows the
+same figures as a chart.
 
 The model hears standard French phones. It does not mark diacritics or non-native or
 pathological variants.

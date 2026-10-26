@@ -1,0 +1,36 @@
+<section class="ranks" aria-labelledby="ranks-title">
+<style>
+.ranks { --r2: #1f4e8c; --r3: #3f78b8; --r4: #78a6d6; --r5: #b6cfe9; --r0: #d6d4cc;
+  --r2-ink: #fff; --r3-ink: #fff; --r4-ink: #1d1d1b; --r5-ink: #1d1d1b; --r0-ink: #1d1d1b;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-top: 12px; padding: 12px 14px 14px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ranks {
+  --r2: #a9cdf5; --r3: #6fa3dc; --r4: #3f71ab; --r5: #2a4c74; --r0: #3a3934;
+  --r2-ink: #161615; --r3-ink: #161615; --r4-ink: #fff; --r5-ink: #ecebe6; --r0-ink: #ecebe6; } }
+:root[data-theme="dark"] .ranks { --r2: #a9cdf5; --r3: #6fa3dc; --r4: #3f71ab; --r5: #2a4c74; --r0: #3a3934;
+  --r2-ink: #161615; --r3-ink: #161615; --r4-ink: #fff; --r5-ink: #ecebe6; --r0-ink: #ecebe6; }
+.ranks h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.ranks .rk-what { color: var(--ink2); font-size: 12.5px; margin: 2px 0 10px; max-width: 900px; }
+.ranks .rk-key { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink2); font-size: 12px; margin-bottom: 8px; }
+.ranks .rk-key i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.ranks .rk-row { display: grid; grid-template-columns: minmax(150px, 260px) 1fr 92px; gap: 10px; align-items: center; margin: 6px 0; }
+.ranks .rk-name { color: var(--ink); font-size: 12.5px; }
+.ranks .rk-name small { color: var(--muted); display: block; font-size: 11px; }
+.ranks .rk-bar { display: flex; gap: 2px; height: 26px; min-width: 0; }
+.ranks .rk-bar span { display: flex; align-items: center; justify-content: center; font-size: 11.5px;
+  font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap; min-width: 0; }
+.ranks .rk-bar span:first-child { border-radius: 4px 0 0 4px; } .ranks .rk-bar span:last-child { border-radius: 0 4px 4px 0; }
+.ranks .rk-tot { color: var(--ink2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ranks .rk-tot b { color: var(--ink); font-weight: 600; }
+.ranks .rk-src { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+@media (max-width: 640px) { .ranks .rk-row { grid-template-columns: 1fr; gap: 3px; margin: 10px 0; } }
+</style>
+<h2 id="ranks-title">How useful are the candidates?</h2>
+<div class="rk-what">When the model's 1st phone is wrong, where is the right phone among its candidates (<code>top2</code> ...
+  <code>top5</code> in the TextGrid; hover over a phone in the plots to see them)? Often 2nd: when you correct a phone,
+  look at the next candidates first.</div>
+<div class="rk-key"><span><i style="background:var(--r2)"></i>2nd</span><span><i style="background:var(--r3)"></i>3rd</span>
+  <span><i style="background:var(--r4)"></i>4th</span><span><i style="background:var(--r5)"></i>5th</span>
+  <span><i style="background:var(--r0)"></i>not in the top 5</span></div>
+<!--__ROWS__-->
+<div class="rk-src">__SOURCE__</div>
+</section>

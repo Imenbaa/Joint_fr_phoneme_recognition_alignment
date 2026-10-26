@@ -213,7 +213,10 @@ How it works (`jointrecalign/transcribe.py`):
 
 Read the probabilities with care: they are the model's own and are **not calibrated**. The top-1
 is often given about 0.99 even when it is wrong, but the **order** of the candidates is
-informative: when the top-1 is wrong, the right phone is often 2nd or 3rd.
+informative: when the top-1 is wrong, the right phone is 2nd in 29 to 57 % of the cases and in the
+top 5 in 53 to 79 %, depending on the kind of speech (measured against reference transcriptions; see
+GUIDE.md, "How far to trust the candidates"; the report shows it as a chart, `RANKS` in
+`jointrecalign/report.py`).
 
 The model cannot see the first and last ~10 ms of each piece, so a gap of 15 to 25 ms with no
 label is left at each cut (about every 10 s) and at the start and end of the recording.
