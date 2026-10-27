@@ -19,7 +19,6 @@ over every phone of the group (micro-average).
 """
 
 import numpy as np
-import pandas as pd
 import Levenshtein
 from jiwer import process_words
 
@@ -146,6 +145,7 @@ def _f1(tp, fp, fn):
 # Pooled boundary statistics over a set of per-phoneme records (ms).
 # ----------------------------------------------------------------------
 def boundary_stats(df):
+    import pandas as pd                       # evaluation only (pip install ".[eval]")
     if len(df) == 0:
         return {}
     s, e, d = df["start_err"], df["end_err"], df["dur_err"]
@@ -186,6 +186,7 @@ def compute_metrics(alignment_store, csv_path, per_phoneme_csv=None,
     Writes a file/style/global metrics CSV, and optionally a per-phoneme CSV.
     All boundary stats are pooled (micro-averaged) within each group.
     """
+    import pandas as pd                       # evaluation only (pip install ".[eval]")
     all_records = []   # long-form: one row per matched phoneme, tagged with file+style
     f1_rows = []       # per-file F1 counts + PER, pooled later
 

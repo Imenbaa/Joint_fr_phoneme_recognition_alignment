@@ -20,9 +20,8 @@ Manifest (JSON):
 Frame timing is read from the model config (frame stride and receptive field),
 so the same code scores 20 ms and 10 ms models.
 """
-import numpy as np, torch, soundfile as sf, librosa, unicodedata
+import numpy as np, torch, soundfile as sf, soxr, unicodedata
 from itertools import groupby
-from librosa.sequence import dtw
 
 SR = 16000
 FRAME_STRIDE_S = 0.02          # wav2vec2: 320 samples @ 16 kHz (default only)
@@ -58,6 +57,14 @@ def frame_time_offset_s(model):
     return (rf - hop) / 2 / model_sr(model)
 
 
+def resample(a, orig_sr, target_sr):
+    """As librosa.resample (default soxr_hq, length ceil(n * ratio)), without librosa."""
+    n = int(np.ceil(a.shape[-1] * float(target_sr) / orig_sr))
+    y = soxr.resample(a, orig_sr, target_sr, quality="soxr_hq")
+    y = y[:n] if len(y) >= n else np.pad(y, (0, n - len(y)))
+    return np.asarray(y, dtype=a.dtype)
+
+
 def to_model_rate(seg, model):
     """16 kHz chunk -> the model's input rate. Audio is always loaded at 16 kHz
     first, so a 32 kHz model sees the same 8 kHz band limit as its (upsampled
@@ -65,7 +72,7 @@ def to_model_rate(seg, model):
     sr = model_sr(model)
     if sr == SR:
         return seg
-    return librosa.resample(seg, orig_sr=SR, target_sr=sr).astype(np.float32)
+    return resample(seg, SR, sr).astype(np.float32)
 
 
 # Hypothesis tokens rewritten before scoring (affricates of the training phone
@@ -79,7 +86,7 @@ def load_audio(path):
     if a.ndim > 1:
         a = np.mean(a, axis=1)
     if sr != SR:
-        a = librosa.resample(a, orig_sr=sr, target_sr=SR)
+        a = resample(a, sr, SR)
     return a.astype(np.float32)
 
 
@@ -89,6 +96,7 @@ def dtw_path(att):
     Steps [1,1] and [1,0]: no skips, every frame consumed once, every phone
     gets at least one frame.
     """
+    from librosa.sequence import dtw          # evaluation only (pip install ".[eval]")
     T, P = att.shape
     if P == 0 or T < P:
         return None

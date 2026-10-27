@@ -17,8 +17,7 @@ dependencies = [
     "transformers>=4.41",
     "numpy",
     "soundfile",
-    "librosa",
-    "pandas",
+    "soxr",
     "Levenshtein",
     "jiwer",
     "silero-vad>=6.2",
@@ -27,6 +26,8 @@ dependencies = [
 [project.optional-dependencies]
 # Training (train_ctc.py, train_aligner.py).
 train = ["datasets", "accelerate", "editdistance", "tensorboard"]
+# Evaluation (evaluate.py, the DTW decode, the metric tables); requirements.txt has them too.
+eval = ["librosa", "pandas"]
 
 [project.scripts]
 JointRecAlign = "jointrecalign.transcribe_cli:main"
