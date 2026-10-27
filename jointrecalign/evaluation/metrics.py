@@ -4,8 +4,9 @@ Phone-alignment metrics.
 Input: an alignment store {file_id: {ref_intervals, hyp_intervals, ref_seq, hyp_seq, style}},
 times in SECONDS; all reported errors are in milliseconds.
 
-  - Boundary F1 at several tolerances: the boundary set is every phone onset
-    together with the final offset, deduplicated; each REFERENCE boundary is
+  - Boundary F1 at several tolerances: the boundary set is every phone start
+    and every phone end, deduplicated (the end of a phone followed by a pause
+    is a boundary too); each REFERENCE boundary is
     matched to the NEAREST unused hypothesis boundary within the tolerance
     (one-to-one); TP/FP/FN are pooled over all utterances before P, R and F1.
   - Boundary errors on phones matched by edit distance (same label only):
@@ -96,7 +97,7 @@ def per_phoneme_errors(ref_alignments, hyp_alignments, ref_seq, hyp_seq):
 # ----------------------------------------------------------------------
 # Boundary-detection F1 (time-only, label-agnostic).
 #
-# Boundary set: every phone onset together with the final offset.
+# Boundary set: every phone start and every phone end, deduplicated.
 #   Taking all starts AND all ends then deduplicating is equivalent to
 #   "starts + last end" under a contiguous segmentation (phone n's end IS
 #   phone n+1's start), but stays correct when a pause leaves a gap between
