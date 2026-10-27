@@ -11,7 +11,8 @@ once, then type one command per corpus (or use a button in Praat).
 
 ## 1. Install (once, about 10 minutes)
 
-You need an internet connection and up to 8 GB of free disk space (less on a Mac).
+You need an internet connection and about 2 GB of free disk space (7 GB on a Linux computer with an
+NVIDIA graphics card).
 
 **On a Mac.** Open the **Terminal** app (Applications › Utilities › Terminal), paste this line,
 press Enter, and wait until it finishes:
@@ -46,11 +47,15 @@ it), install uv in one of these ways instead:
 Then **close the Terminal / PowerShell window, open a new one**, and paste:
 
 ```
-uv tool install --python 3.12 "JointRecAlign @ https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/archive/refs/heads/main.zip"
+uv tool install --torch-backend auto --python 3.12 "JointRecAlign @ https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/archive/refs/heads/main.zip"
 ```
 
-It downloads about 1 to 3 GB of software (several minutes). Finally, download the model
-(1.2 GB, also only once):
+`--torch-backend auto` installs the version of PyTorch (the library the model runs on) that suits your
+computer: without an NVIDIA graphics card, the small one; with one, the one that uses it. Without
+this option, a Linux computer would get the NVIDIA version (about 5 GB more) even with no NVIDIA card.
+
+It installs about 0.7 to 1 GB of software (several minutes; about 6 GB on a Linux computer with an
+NVIDIA graphics card). Finally, download the model (1.2 GB, also only once):
 
 ```
 JointRecAlign download

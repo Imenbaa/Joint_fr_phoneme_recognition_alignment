@@ -102,6 +102,12 @@ knowledge needed), or, in an existing Python environment:
 pip install git+https://github.com/Imenbaa/Joint_phoneme_recognition_alignment.git
 ```
 
+On Linux, pip installs the CUDA build of PyTorch by default (about 5 GB of NVIDIA libraries). Without an
+NVIDIA GPU, install the CPU build first:
+`pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`
+(with uv, `--torch-backend auto` chooses the build that matches the computer, as in GUIDE.md).
+The evaluation scripts also need `pip install ".[eval]"` (librosa, pandas), which `requirements.txt` covers.
+
 Both install the `JointRecAlign` command.
 
 **To train or evaluate**, clone the repository:
