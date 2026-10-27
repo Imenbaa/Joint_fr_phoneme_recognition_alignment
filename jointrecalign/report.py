@@ -7,7 +7,9 @@ A recording's page shows, on one time axis that scrolls and zooms:
   attention   the aligner's log attention over the recognised phones and SIL,
               with the SIL-Viterbi path (where the boundaries come from),
   posteriors  the CTC log posterior of every vocabulary symbol per frame, and P(blank),
-  top 5       the five most probable symbols of each frame, by rank (from the unclipped posteriors).
+  top 5       the five candidates of each recognised phone, coloured by probability (log scale);
+              with a reference, whether the reference phone is the 1st candidate, among the others,
+              or not in the top 5.
 With a reference (reference.py), the reference phones and pauses are drawn on every
 panel and each recognised phone is marked as matching, substituted or inserted.
 
@@ -79,10 +81,7 @@ def page_data(name, audio_rel, wav, phones, pauses, dur, trace, tok, symbol_map,
     chunks, tokens = [], []
     for t in trace:
         lp_rows = t["ctc_logp"][:, ids]                  # (T, rows)
-        # the top 5 of each frame from the unclipped posteriors: the 8-bit copy ties every symbol
-        # under exp(FLOOR), which is all of them but blank in most frames
-        top5 = np.argsort(-lp_rows, axis=1, kind="stable")[:, :5].astype(np.uint8)
-        c = {"t0": t["start"] + t["offset"], "T": t["frames"], "post": _b64(_q(lp_rows.T)), "top5": _b64(top5)}
+        c = {"t0": t["start"] + t["offset"], "T": t["frames"], "post": _b64(_q(lp_rows.T))}
         if t["path"] is not None:
             toks = [symbol_map.get(E.HYP_FIX.get(s, s), E.HYP_FIX.get(s, s)) for s in t["tokens"]]
             P, T = len(toks), t["frames"]
@@ -109,7 +108,7 @@ def page_data(name, audio_rel, wav, phones, pauses, dur, trace, tok, symbol_map,
         "rows": [l for _, l in rows], "breaks": breaks, "tokens": tokens, "chunks": chunks,
         "wave": _b64(_waveform(wav, dur, hop)),
         "phones": [[round(p["start"], 4), round(p["end"], 4), p["phone"],
-                    [[s, round(v, 4)] for s, v in p["cands"]]] for p in phones],
+                    [[s, float(f"{v:.3g}")] for s, v in p["cands"]]] for p in phones],
         "pauses": [[round(s, 4), round(e, 4)] for s, e in pauses],
         "ref": _ref_data(comparison),
     }

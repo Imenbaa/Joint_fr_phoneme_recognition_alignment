@@ -163,7 +163,7 @@ For each recording, in a folder `JointRecAlign/` next to the recording (or in `-
 |---|---|
 | `<name>.TextGrid` | Praat interval tiers, all covering the whole recording |
 | `<name>.csv` | one row per phone: `start`, `end`, `phone`, then `top1`, `p1` ... `top5`, `p5` |
-| `<name>.html` | with `--report`: waveform, phones and pauses, the aligner's attention with the alignment path, the CTC posteriors of every phone, the top 5 of each frame, on one time axis that scrolls and zooms; self-contained, no server (`index.html` lists the recordings) |
+| `<name>.html` | with `--report`: waveform, phones and pauses, the aligner's attention with the alignment path, the CTC posteriors of every phone, the five candidates of each phone coloured by probability, on one time axis that scrolls and zooms; self-contained, no server (`index.html` lists the recordings) |
 
 | tier | label of each interval |
 |---|---|
@@ -203,8 +203,9 @@ summary lists the reference labels that are not phones of the model; they count 
 `comparison.csv` (one row per recording and a `TOTAL` row; corpus figures pool the counts of all
 recordings), the scores in the summary and, with `--report`, in the pages: reference lane under the
 recognised phones (amber: substituted, red: inserted / deleted), reference boundaries and pauses
-in red on the attention, reference phones as red boxes on the posteriors and the top 5, and a
-"show reference" switch. A reference TextGrid is never overwritten (`-o` into the reference folder
+in red on the attention, reference phones as red boxes on the posteriors, on the top 5 a reference
+strip with each recognised phone's candidates outlined in green (reference = 1st) or red
+(reference among the others), and a "show reference" switch. A reference TextGrid is never overwritten (`-o` into the reference folder
 is refused when the names collide).
 
 How it works (`jointrecalign/transcribe.py`):

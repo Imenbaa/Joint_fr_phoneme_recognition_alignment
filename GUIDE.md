@@ -127,7 +127,9 @@ with how many phones each has and how many the model was unsure about. Click a n
 - the **attention** of the model: which phone each moment of the audio is attached to; the
   line is the path that gives the boundaries;
 - the **phone posteriors**: how probable every phone is at each moment;
-- the **top 5** of each moment.
+- the **top 5 of each phone**: its five candidates, 1st at the top, coloured by probability; with
+  `--reference`, a green outline when your phone is the 1st candidate, a red one when it is among
+  the others.
 
 Drag to scroll, ⌘/Ctrl + mouse wheel to zoom, space to play. The address of the page follows the
 view (e.g. `ABC_01.html#12.5-14.5`): copy it to show someone the same place.
