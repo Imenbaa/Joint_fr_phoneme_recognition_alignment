@@ -1,4 +1,4 @@
-# A joint phoneme recognition and alignment model
+# A joint French phoneme recognition and alignment model
 
 [![PyPI](https://img.shields.io/pypi/v/JointRecAlign)](https://pypi.org/project/JointRecAlign/)
 
