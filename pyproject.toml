@@ -43,11 +43,11 @@ train = ["datasets", "accelerate", "editdistance", "tensorboard"]
 eval = ["librosa", "pandas"]
 
 [project.urls]
-Homepage = "https://github.com/Imenbaa/Joint_phoneme_recognition_alignment"
-Repository = "https://github.com/Imenbaa/Joint_phoneme_recognition_alignment"
-Documentation = "https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/blob/main/GUIDE.md"
-Issues = "https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/issues"
-"Model release" = "https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/releases/tag/v0.1.0"
+Homepage = "https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment"
+Repository = "https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment"
+Documentation = "https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/blob/main/GUIDE.md"
+Issues = "https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/issues"
+"Model release" = "https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/releases/tag/v0.1.0"
 
 [project.scripts]
 JointRecAlign = "jointrecalign.transcribe_cli:main"

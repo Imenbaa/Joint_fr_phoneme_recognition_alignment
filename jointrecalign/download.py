@@ -14,7 +14,7 @@ import urllib.request
 import zipfile
 
 MODEL_NAME = "aligner_10ms_sil_alpha0.1"
-MODEL_URL = ("https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/releases/download/"
+MODEL_URL = ("https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/releases/download/"
              f"v0.1.0/{MODEL_NAME}.zip")
 MODEL_SHA256 = "a1afc8f77544475e062b9de252abfe2d1b9f10c79f5b9f4e702c57548ee67f7a"
 

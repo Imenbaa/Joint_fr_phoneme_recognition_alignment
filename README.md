@@ -11,7 +11,7 @@ This repository has the code to train the models from scratch, to evaluate them 
 to transcribe recordings into Praat TextGrids (phones, boundaries, pauses and the model's top-5
 candidates for each phone), with no transcript needed.
 
-**Phoneticians: start with the [step-by-step guide](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/blob/main/GUIDE.md)**: install with two commands, then
+**Phoneticians: start with the [step-by-step guide](https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/blob/main/GUIDE.md)**: install with two commands, then
 transcribe a corpus with one command (with an optional HTML report of the plots), or from Praat.
 
 ## Contents
@@ -97,14 +97,14 @@ At inference the model aligns its own CTC decode, so it needs no transcription.
 
 Python ≥ 3.10. A CUDA GPU for training; transcription also runs on CPU.
 
-**To transcribe recordings only**, see the [step-by-step guide](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/blob/main/GUIDE.md) (no Python
+**To transcribe recordings only**, see the [step-by-step guide](https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/blob/main/GUIDE.md) (no Python
 knowledge needed), or, in an existing Python environment:
 
 ```bash
 pip install JointRecAlign
 ```
 
-(`pip install git+https://github.com/Imenbaa/Joint_phoneme_recognition_alignment.git` installs the
+(`pip install git+https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment.git` installs the
 latest code from GitHub instead of the latest release.)
 
 The model runs on PyTorch, and the PyTorch build that pip installs depends on the computer:
@@ -127,8 +127,8 @@ Both install the `JointRecAlign` command.
 **To train or evaluate**, clone the repository:
 
 ```bash
-git clone https://github.com/Imenbaa/Joint_phoneme_recognition_alignment.git
-cd Joint_phoneme_recognition_alignment
+git clone https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment.git
+cd Joint_fr_phoneme_recognition_alignment
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt     # versions used to train the models
 pip install -e .                    # the jointrecalign package
@@ -158,8 +158,8 @@ would write the same result files), skips the files that cannot be transcribed, 
 one fails, and ends with a summary, also written to `JointRecAlign.log`. The exit code is 1 when
 a recording was not transcribed.
 
-**The model** ([`aligner_10ms_sil_alpha0.1.zip`](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/releases/download/v0.1.0/aligner_10ms_sil_alpha0.1.zip),
-1.2 GB, [release v0.1.0](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/releases/tag/v0.1.0),
+**The model** ([`aligner_10ms_sil_alpha0.1.zip`](https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/releases/download/v0.1.0/aligner_10ms_sil_alpha0.1.zip),
+1.2 GB, [release v0.1.0](https://github.com/Imenbaa/Joint_fr_phoneme_recognition_alignment/releases/tag/v0.1.0),
 licence CC BY-NC 4.0) is downloaded and checked the first time (or with `JointRecAlign download`)
 into a cache folder: `~/.cache/JointRecAlign` (Linux), `~/Library/Caches/JointRecAlign` (macOS),
 `%LOCALAPPDATA%\JointRecAlign` (Windows); `JOINTRECALIGN_HOME` changes it. Any stage-3 checkpoint
