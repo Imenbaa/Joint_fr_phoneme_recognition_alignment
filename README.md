@@ -1,5 +1,7 @@
 # A joint phoneme recognition and alignment model
 
+[![PyPI](https://img.shields.io/pypi/v/JointRecAlign)](https://pypi.org/project/JointRecAlign/)
+
 Joint **phone recognition and phone alignment** for French speech, with one wav2vec2 model.
 A CTC head transcribes the speech into phones. A cross-attention aligner, trained in the same
 network, places each phone in time, with optional silences. The same model gives the phone
