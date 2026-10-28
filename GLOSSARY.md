@@ -70,6 +70,14 @@ _Avoid_: attention logits, similarity matrix
 A frame × phone preference for the diagonal (early frames with early phones), added to the attention energy and faded out during training.
 _Avoid_: diagonal prior, guided attention
 
+**Alignment path**:
+One monotonic way of assigning frames to the target phones: phones in order, none skipped, each covering a contiguous run of frames.
+_Avoid_: alignment hypothesis
+
+**ForwardSum loss**:
+The alignment loss (L_FS): minus the log of the total probability of all alignment paths, computed from the attention energy.
+_Avoid_: FS-CTC, monotonic alignment loss
+
 ## Training stages
 
 **Stage**:
