@@ -9,7 +9,7 @@ This repository has the code to train the models from scratch, to evaluate them 
 to transcribe recordings into Praat TextGrids (phones, boundaries, pauses and the model's top-5
 candidates for each phone), with no transcript needed.
 
-**Phoneticians: start with the [step-by-step guide](GUIDE.md)**: install with two commands, then
+**Phoneticians: start with the [step-by-step guide](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/blob/main/GUIDE.md)**: install with two commands, then
 transcribe a corpus with one command (with an optional HTML report of the plots), or from Praat.
 
 ## Contents
@@ -95,7 +95,7 @@ At inference the model aligns its own CTC decode, so it needs no transcription.
 
 Python ≥ 3.10. A CUDA GPU for training; transcription also runs on CPU.
 
-**To transcribe recordings only**, see the [step-by-step guide](GUIDE.md) (no Python
+**To transcribe recordings only**, see the [step-by-step guide](https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/blob/main/GUIDE.md) (no Python
 knowledge needed), or, in an existing Python environment:
 
 ```bash
