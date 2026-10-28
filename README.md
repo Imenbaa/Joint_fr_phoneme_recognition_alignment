@@ -99,14 +99,26 @@ Python ≥ 3.10. A CUDA GPU for training; transcription also runs on CPU.
 knowledge needed), or, in an existing Python environment:
 
 ```bash
-pip install git+https://github.com/Imenbaa/Joint_phoneme_recognition_alignment.git
+pip install JointRecAlign
 ```
 
-On Linux, pip installs the CUDA build of PyTorch by default (about 5 GB of NVIDIA libraries). Without an
-NVIDIA GPU, install the CPU build first:
-`pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`
-(with uv, `--torch-backend auto` chooses the build that matches the computer, as in GUIDE.md).
-The evaluation scripts also need `pip install ".[eval]"` (librosa, pandas), which `requirements.txt` covers.
+(`pip install git+https://github.com/Imenbaa/Joint_phoneme_recognition_alignment.git` installs the
+latest code from GitHub instead of the latest release.)
+
+The model runs on PyTorch, and the PyTorch build that pip installs depends on the computer:
+
+| Computer | pip installs | To do |
+|---|---|---|
+| Linux with an NVIDIA GPU | the CUDA build | nothing |
+| Linux without an NVIDIA GPU | the CUDA build (about 5 GB of NVIDIA libraries it does not use) | install the CPU build first: `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu` |
+| Windows with an NVIDIA GPU | the CPU build (the GPU stays unused) | install a CUDA build first, with the command for your setup from [pytorch.org](https://pytorch.org/get-started/locally/) |
+| macOS, Windows without an NVIDIA GPU | the right build | nothing |
+
+When torch is already installed, `pip install JointRecAlign` keeps it. With uv,
+`uv pip install --torch-backend auto JointRecAlign` chooses the build that matches the computer
+(GUIDE.md does the same with `uv tool install`).
+The evaluation scripts also need `pip install "JointRecAlign[eval]"` (librosa, pandas), which
+`requirements.txt` covers.
 
 Both install the `JointRecAlign` command.
 
