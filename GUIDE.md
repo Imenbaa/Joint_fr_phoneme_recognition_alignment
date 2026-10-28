@@ -47,7 +47,7 @@ it), install uv in one of these ways instead:
 Then **close the Terminal / PowerShell window, open a new one**, and paste:
 
 ```
-uv tool install --torch-backend auto --python 3.12 "JointRecAlign @ https://github.com/Imenbaa/Joint_phoneme_recognition_alignment/archive/refs/heads/main.zip"
+uv tool install --torch-backend auto --python 3.12 JointRecAlign
 ```
 
 `--torch-backend auto` installs the version of PyTorch (the library the model runs on) that suits your
