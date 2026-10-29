@@ -78,6 +78,25 @@ _Avoid_: alignment hypothesis
 The alignment loss (L_FS): minus the log of the total probability of all alignment paths, computed from the attention energy.
 _Avoid_: FS-CTC, monotonic alignment loss
 
+## Silence
+
+**SIL**:
+The latent optional silence state: a pause that an alignment path may place between phones, discovered by the model without pause labels.
+_Avoid_: blank, pause token, sp
+
+**SIL slot**:
+A position in the target phone sequence where a SIL may sit: start, end and word boundaries in training; start, end and between every two phones at inference.
+_Avoid_: SIL position (when the allowed place is meant)
+
+**SIL key**:
+The single learned key shared by every SIL slot, compared with the frame queries like a phone key.
+
+**Entry cost**:
+The fixed log-probability penalty (−2) a path pays each time it enters a SIL slot.
+
+**Minimum SIL length**:
+The shortest pause a path may place, 4 frames (40 ms); shorter quiet stretches stay inside the phones.
+
 ## Training stages
 
 **Stage**:
