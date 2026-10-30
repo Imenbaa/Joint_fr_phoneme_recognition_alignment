@@ -78,6 +78,24 @@ _Avoid_: alignment hypothesis
 The alignment loss (L_FS): minus the log of the total probability of all alignment paths, computed from the attention energy.
 _Avoid_: FS-CTC, monotonic alignment loss
 
+## Reconstruction
+
+**Alignment content**:
+The mixture of phone keys (and the SIL key) that the alignment places at one frame; written YA.
+_Avoid_: attended keys, context vector
+
+**Code**:
+The nearest of the codebook's sound categories for one encoder frame; the target the reconstruction must pick.
+_Avoid_: quantized target, codevector (when the frame's category is meant)
+
+**Masked reconstruction loss**:
+L_m: picking each tested frame's code among distractors from its alignment content alone.
+_Avoid_: contrastive loss, InfoNCE (the scoring rule, not the loss's purpose)
+
+**Loudness loss**:
+L_energy: predicting each frame's waveform loudness from its alignment content alone.
+_Avoid_: energy loss (clashes with attention energy)
+
 ## Silence
 
 **SIL**:
