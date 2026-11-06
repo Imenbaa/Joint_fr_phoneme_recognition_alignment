@@ -380,15 +380,14 @@ reference phone intervals:
 ### Building a manifest
 
 `make_manifest.py` builds a manifest from a folder of recordings and Praat TextGrids that have a
-phone tier. The chunks come from the [WhisperX](https://github.com/m-bain/whisperX) voice
-activity detector (pyannote segmentation, onset 0.5 / offset 0.363). Speech is cut and merged
-into chunks of at most 10 s, with pauses kept inside a chunk. WhisperX pins its own `torch`
-version, so install it in a separate environment:
+phone tier. The chunks are the pieces `JointRecAlign transcribe` cuts the recording into
+(`chunk_bounds` in `jointrecalign/transcribe.py`): at most 10 s, back to back from the start to the
+end of the recording, each cut in the middle of the latest pause that
+[Silero VAD](https://github.com/snakers4/silero-vad) finds (or, with no pause, where speech is
+least likely). The evaluation therefore scores exactly what the toolkit does. It runs in the same
+environment as the rest:
 
 ```bash
-python -m venv .venv-manifest && source .venv-manifest/bin/activate
-pip install -r requirements-manifest.txt
-
 python make_manifest.py --audio_dir wav/ --textgrid_dir textgrids/ --tier phones \
     --phone_map phone_map.json --skip_labels "<noise>" "<unk>" \
     --style=_read=read,_spont=spontaneous --out manifest.json
@@ -461,7 +460,7 @@ skipped without it.
 train_ctc.py              stages 0-2: data preparation, CTC fine-tuning (20 or 10 ms)
 train_aligner.py          stage 3: joint recognition + alignment model
 evaluate.py               alignment evaluation on a manifest
-make_manifest.py          evaluation manifest from audio + TextGrids (WhisperX VAD chunks)
+make_manifest.py          evaluation manifest from audio + TextGrids (Silero chunks, as transcribe)
 transcribe.py             recordings -> TextGrids (= JointRecAlign)
 GUIDE.md                  step-by-step guide for phoneticians
 recipes/                  one script per stage, with the settings of the trained models
@@ -480,7 +479,6 @@ jointrecalign/
     attention_eval.py     manifest loop, DTW decode, frame timing
     sil_eval.py           SIL Viterbi decode and silence scores
     ctcfa_eval.py         CTC forced-alignment baseline
-    vad_chunking.py       WhisperX VAD chunking (used by make_manifest.py)
     metrics.py            boundary F1, errors, PER
 tests/
 ```
