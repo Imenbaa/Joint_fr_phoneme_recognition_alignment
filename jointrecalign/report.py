@@ -3,7 +3,8 @@ index of the recordings of an output folder. Opened by double-clicking; no
 server, no internet.
 
 A recording's page shows, on one time axis that scrolls and zooms:
-  waveform, recognised phones and pauses (hover: the top-5 of a phone; click: play it),
+  waveform, spectrogram, recognised phones and pauses (hover: the top-5 of a phone; click: play it);
+              both drawn in the browser from the signal, for the part on screen,
   attention   the aligner's log attention over the recognised phones and SIL,
               with the SIL-Viterbi path (where the boundaries come from),
   posteriors  the CTC log posterior of every vocabulary symbol per frame, and P(blank),
@@ -13,9 +14,10 @@ A recording's page shows, on one time axis that scrolls and zooms:
 With a reference (reference.py), the reference phones and pauses are drawn on every
 panel and each recognised phone is marked as matching, substituted or inserted.
 
-The arrays are stored as 8-bit values (log probabilities clipped at -10); the
-attention is kept in a band of +-BAND phones around the path, so a page stays
-small (about 1 MB per minute of audio).
+The signal is stored as 16-bit samples at 16 kHz (peak-normalised), so the
+waveform and the spectrogram keep their detail when zoomed in. The model arrays are
+stored as 8-bit values (log probabilities clipped at -10); the attention is kept in
+a band of +-BAND phones around the path. A page takes about 3.5 MB per minute of audio.
 """
 import base64
 import html
@@ -62,16 +64,10 @@ def vocab_rows(tok, symbol_map):
     return rows, [1] + breaks
 
 
-def _waveform(wav, dur, hop):
-    """min and max of the (peak-normalised) signal per frame, as int8 pairs."""
-    n = int(np.ceil(dur / hop))
-    step = max(1, int(round(hop * E.SR)))
-    x = np.zeros(n * step, np.float32)
-    x[:min(len(wav), n * step)] = wav[:n * step]
-    x = x.reshape(n, step)
+def _signal(wav):
+    """the 16 kHz signal, peak-normalised, as little-endian int16."""
     peak = float(np.abs(wav).max()) or 1.0
-    mm = np.stack([x.min(1), x.max(1)], 1) / peak
-    return np.round(mm * 127).astype(np.int8)
+    return np.round(np.asarray(wav, np.float32) / peak * 32767).astype("<i2")
 
 
 def page_data(name, audio_rel, wav, phones, pauses, dur, trace, tok, symbol_map, comparison=None):
@@ -106,7 +102,7 @@ def page_data(name, audio_rel, wav, phones, pauses, dur, trace, tok, symbol_map,
     return {
         "name": name, "audio": audio_rel, "duration": dur, "hop": hop, "floor": FLOOR, "band": BAND,
         "rows": [l for _, l in rows], "breaks": breaks, "tokens": tokens, "chunks": chunks,
-        "wave": _b64(_waveform(wav, dur, hop)),
+        "sr": E.SR, "signal": _b64(_signal(wav)),
         "phones": [[round(p["start"], 4), round(p["end"], 4), p["phone"],
                     [[s, float(f"{v:.3g}")] for s, v in p["cands"]]] for p in phones],
         "pauses": [[round(s, 4), round(e, 4)] for s, e in pauses],

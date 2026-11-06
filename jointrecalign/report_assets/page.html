@@ -63,6 +63,7 @@ body:not(.has-ref) .reflegend { display: none; }
   font-size: 12px; padding: 0 12px 6px 34px; }
 .legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; vertical-align: -1px;
   margin-right: 5px; }
+.legend select { padding: 2px 6px; font-size: 12px; }
 .scale { width: 120px; height: 10px; border-radius: 2px; display: inline-block; vertical-align: -1px; margin: 0 5px; }
 canvas { display: block; width: 100%; touch-action: none; }
 .cv { padding: 0 8px 8px; }
@@ -104,7 +105,17 @@ canvas { display: block; width: 100%; touch-action: none; }
   <div class="panel" style="padding:8px 8px 4px"><canvas id="overview"></canvas></div>
 
   <details class="panel" open>
-    <summary><h2>Recording</h2><span class="what">waveform, recognised phones and pauses</span></summary>
+    <summary><h2>Recording</h2><span class="what">waveform, spectrogram, recognised phones and pauses</span></summary>
+    <div class="legend"><span>spectrogram</span>
+      <select id="specwin" title="Analysis window (Gaussian)"><option value="0.005" selected>wideband (5 ms)</option>
+        <option value="0.03">narrowband (30 ms)</option></select>
+      <select id="specmax" title="Highest frequency shown"><option value="5000" selected>0–5 kHz</option>
+        <option value="8000">0–8 kHz</option></select>
+      <select id="specrange" title="Dynamic range: the levels shown below the loudest point on screen">
+        <option value="40">40 dB</option><option value="50" selected>50 dB</option><option value="70">70 dB</option></select>
+      <span>darker: more energy (+6 dB/octave pre-emphasis, as in Praat)</span>
+      <span><i style="background:var(--accent)"></i>recognised boundaries</span>
+      <span class="reflegend"><i style="background:#ff4d4d"></i>reference boundaries</span></div>
     <div class="legend reflegend" id="cmplegend"><span><i style="background:var(--phone)"></i>same phone as the reference</span>
       <span><i style="background:var(--sub)"></i>substituted</span><span><i style="background:var(--err)"></i>inserted (recognised) / deleted (reference)</span></div>
     <div class="cv"><canvas id="tiers"></canvas></div>
@@ -150,7 +161,21 @@ function bytes(b64) { const s = atob(b64), a = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
 function int16(b64) { const u = bytes(b64); return new Int16Array(u.buffer, 0, u.length >> 1); }
 const HOP = D.hop, FLOOR = D.floor, BAND = D.band, NR = D.rows.length, DUR = D.duration;
-const wave = new Int8Array(bytes(D.wave).buffer);
+const SR = D.sr, sig = int16(D.signal), NS = sig.length;     // the signal, peak-normalised
+// min and max of every block of EB samples, for the waveform when zoomed out
+const EB = 64, NB = Math.ceil(NS / EB), emin = new Int16Array(NB), emax = new Int16Array(NB);
+for (let k = 0; k < NB; k++) { let lo = 32767, hi = -32768;
+  for (let i = k * EB, e = Math.min(NS, i + EB); i < e; i++) { const v = sig[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  emin[k] = lo; emax[k] = hi; }
+// [min, max] of the samples [a, b), or null
+function minmax(a, b) { a = Math.max(0, Math.floor(a)); b = Math.min(NS, Math.ceil(b)); if (b <= a) return null;
+  let lo = 32767, hi = -32768;
+  const raw = (i, e) => { for (; i < e; i++) { const v = sig[i]; if (v < lo) lo = v; if (v > hi) hi = v; } };
+  const ka = Math.ceil(a / EB), kb = Math.floor(b / EB);
+  if (kb - ka > 4) { raw(a, ka * EB); raw(kb * EB, b);
+    for (let k = ka; k < kb; k++) { if (emin[k] < lo) lo = emin[k]; if (emax[k] > hi) hi = emax[k]; } }
+  else raw(a, b);
+  return [lo, hi]; }
 const chunks = D.chunks.map(c => {
   const o = { t0: c.t0, T: c.T, post: bytes(c.post) };
   if (c.band) Object.assign(o, { tok0: c.tok0, P: c.P, center: int16(c.center), path: int16(c.path),
@@ -194,7 +219,7 @@ for (const c of chunks) {
 let v0 = 0, v1 = Math.min(DUR, 10);
 const GUT = 64;                                      // left gutter for row labels
 const fmt = t => { const m = Math.floor(t / 60), s = t - 60 * m; return `${m}:${s.toFixed(2).padStart(5, "0")}`; };
-let setView = function (a, b) { let w = Math.max(0.2, Math.min(DUR, b - a)); a = Math.max(0, Math.min(DUR - w, a));
+let setView = function (a, b) { let w = Math.max(0.05, Math.min(DUR, b - a)); a = Math.max(0, Math.min(DUR - w, a));
   v0 = a; v1 = a + w; draw(); };
 const X = (t, W) => GUT + (t - v0) / (v1 - v0) * (W - GUT);
 const Tm = (x, W) => v0 + (x - GUT) / (W - GUT) * (v1 - v0);
@@ -205,12 +230,12 @@ function setup(cv, h) { const dpr = window.devicePixelRatio || 1, W = cv.clientW
   x.font = "11px -apple-system, Segoe UI, Roboto, sans-serif"; return [x, W, h]; }
 
 function grid(x, W, top, bot, labels) {
-  const span = v1 - v0, steps = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 120, 300];
+  const span = v1 - v0, steps = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 120, 300];
   const st = steps.find(s => span / s <= Math.max(4, (W - GUT) / 90)) || 600;
   x.strokeStyle = css("--line"); x.fillStyle = css("--muted"); x.lineWidth = 1;
   for (let t = Math.ceil(v0 / st) * st; t <= v1 + 1e-9; t += st) { const px = Math.round(X(t, W)) + 0.5;
     x.beginPath(); x.moveTo(px, top); x.lineTo(px, bot); x.stroke();
-    if (labels) x.fillText(st < 1 ? t.toFixed(st < 0.1 ? 2 : 1) : fmt(t).replace(/\.00$/, ""), px + 3, bot - 3); }
+    if (labels) x.fillText(st < 1 ? t.toFixed(st < 0.01 ? 3 : st < 0.1 ? 2 : 1) : fmt(t).replace(/\.00$/, ""), px + 3, bot - 3); }
 }
 function playhead(x, W, h) { const t = audio.currentTime; if (t < v0 || t > v1 || (!playing && t === 0)) return;
   x.strokeStyle = css("--play"); x.lineWidth = 1.5; x.beginPath(); x.moveTo(X(t, W), 0); x.lineTo(X(t, W), h); x.stroke(); }
@@ -218,13 +243,14 @@ function playhead(x, W, h) { const t = audio.currentTime; if (t < v0 || t > v1 |
 function visibleChunks() { return chunks.filter(c => c.t0 + c.T * HOP > v0 && c.t0 < v1); }
 
 // ---------- panels ----------
+let ovEnv = null;
 function drawOverview() {
   const [x, W, h] = setup(document.getElementById("overview"), 44); x.clearRect(0, 0, W, h);
-  const n = wave.length / 2, mid = h / 2 - 4;
+  const mid = h / 2 - 4;
+  if (!ovEnv || ovEnv.W !== W) { ovEnv = { W, r: [] };
+    for (let px = 0; px < W; px++) ovEnv.r.push(minmax(px / W * NS, (px + 1) / W * NS)); }
   x.fillStyle = css("--wave"); x.globalAlpha = 0.55;
-  for (let px = 0; px < W; px++) { const a = Math.floor(px / W * n), b = Math.max(a + 1, Math.floor((px + 1) / W * n));
-    let lo = 0, hi = 0; for (let i = a; i < b && i < n; i++) { lo = Math.min(lo, wave[2*i]); hi = Math.max(hi, wave[2*i+1]); }
-    x.fillRect(px, mid - hi / 127 * mid, 1, Math.max(1, (hi - lo) / 127 * mid)); }
+  ovEnv.r.forEach((r, px) => { if (r) x.fillRect(px, mid - r[1] / 32768 * mid, 1, Math.max(1, (r[1] - r[0]) / 32768 * mid)); });
   x.globalAlpha = 1; x.fillStyle = css("--pause");
   for (const [s, e] of D.pauses) x.fillRect(s / DUR * W, h - 5, Math.max(1, (e - s) / DUR * W), 4);
   x.fillStyle = css("--view"); x.fillRect(v0 / DUR * W, 0, Math.max(2, (v1 - v0) / DUR * W), h);
@@ -233,19 +259,35 @@ function drawOverview() {
 }
 
 function drawTiers() {
-  const WV = 92, PH = 34, PA = 22, RL = showRef() ? PH + 4 : 0, H = 170 + RL;
+  const WV = 92, SPH = 180, PH = 34, PA = 22, RL = showRef() ? PH + 4 : 0, H = 174 + SPH + RL;
   const [x, W] = setup(document.getElementById("tiers"), H); x.clearRect(0, 0, W, H);
-  grid(x, W, 0, WV + PH + PA + RL + 6, false);
+  grid(x, W, 0, WV + SPH + PH + PA + RL + 10, false);
   x.save(); x.beginPath(); x.rect(GUT, 0, W - GUT, H); x.clip();
-  // waveform
-  const n = wave.length / 2, mid = WV / 2;
-  x.fillStyle = css("--wave");
-  for (let px = GUT; px < W; px++) { const a = Math.max(0, Math.floor(Tm(px, W) / HOP)), b = Math.max(a + 1, Math.floor(Tm(px + 1, W) / HOP));
-    if (a >= n) break; let lo = 0, hi = 0;
-    for (let i = a; i < b && i < n; i++) { lo = Math.min(lo, wave[2*i]); hi = Math.max(hi, wave[2*i+1]); }
-    x.fillRect(px, mid - hi / 127 * (mid - 2), 1, Math.max(1, (hi - lo) / 127 * (mid - 2))); }
+  // waveform: the samples themselves when zoomed in, else their min and max per pixel
+  const mid = WV / 2, amp = (mid - 3) / 32768, spp = (v1 - v0) * SR / (W - GUT);
+  x.fillStyle = css("--line"); x.fillRect(GUT, mid, W - GUT, 1);
+  x.fillStyle = x.strokeStyle = css("--wave");
+  if (spp < 1.5) { const a = Math.max(0, Math.floor(v0 * SR) - 1), b = Math.min(NS, Math.ceil(v1 * SR) + 2);
+    x.lineWidth = 1.2; x.lineJoin = "round"; x.beginPath();
+    for (let i = a; i < b; i++) { const px = X(i / SR, W), y = mid - sig[i] * amp; if (i === a) x.moveTo(px, y); else x.lineTo(px, y); }
+    x.stroke();
+    if (spp < 0.25) for (let i = a; i < b; i++) x.fillRect(X(i / SR, W) - 1.5, mid - sig[i] * amp - 1.5, 3, 3); }
+  else for (let px = GUT; px < W; px++) { const r = minmax(Tm(px, W) * SR, Tm(px + 1, W) * SR); if (!r) continue;
+    x.fillRect(px, mid - r[1] * amp, 1, Math.max(1, (r[1] - r[0]) * amp)); }
+  // spectrogram
+  const ys = WV + 4; specBox = { top: ys, h: SPH, sp: null };
+  if (v1 - v0 <= SPEC_MAXVIEW) {
+    const sp = spectrogram(W - GUT, Math.round(SPH * (window.devicePixelRatio || 1)));
+    specBox.sp = sp; x.drawImage(sp.img, GUT, ys, W - GUT, SPH);
+    x.strokeStyle = css("--accent"); x.lineWidth = 1; x.globalAlpha = 0.85;
+    for (const p of phones) for (const t of [p.s, p.e]) { if (t < v0 || t > v1) continue;
+      x.beginPath(); x.moveTo(X(t, W), ys); x.lineTo(X(t, W), ys + SPH); x.stroke(); }
+    x.globalAlpha = 1;
+    if (showRef()) refOverlay(x, W, ys, ys + SPH, false);
+  } else { x.fillStyle = css("--muted"); x.fillText(`zoom in to ${SPEC_MAXVIEW} s or less to see the spectrogram`, GUT + 8, ys + SPH / 2); }
+  x.strokeStyle = css("--line"); x.strokeRect(GUT + 0.5, ys + 0.5, W - GUT - 1, SPH - 1);
   // phones
-  const y0 = WV + 4;
+  const y0 = ys + SPH + 4;
   const lane = (items, y, fill, hov) => { for (const p of items) { if (p.e < v0 || p.s > v1) continue;
     const a = X(p.s, W), b = X(p.e, W);
     x.fillStyle = p === hov ? css("--accent-soft") : fill(p); x.fillRect(a + 0.5, y, Math.max(1, b - a - 1), PH);
@@ -267,6 +309,13 @@ function drawTiers() {
   x.restore();
   // gutter labels and time axis
   x.fillStyle = css("--ink2"); x.fillText("waveform", 4, 14); x.fillText("phones", 4, y0 + PH / 2 + 4); x.fillText("pauses", 4, y1 + 15);
+  // frequency axis of the spectrogram
+  const fmax = SPEC.fmax, fstep = fmax > 5000 ? 2000 : 1000;
+  x.fillStyle = css("--muted"); x.strokeStyle = css("--muted"); x.textAlign = "right";
+  for (let f = 0; f <= fmax; f += fstep) { const y = ys + SPH - f / fmax * SPH;
+    x.beginPath(); x.moveTo(GUT - 4, y); x.lineTo(GUT, y); x.stroke();
+    x.fillText(f === 0 ? "0 Hz" : f / 1000 + " kHz", GUT - 6, Math.min(ys + SPH - 2, Math.max(ys + 10, y + 4))); }
+  x.textAlign = "left";
   if (RL) { x.fillStyle = css("--ref"); x.fillText("reference", 4, yr + PH / 2 + 4); }
   x.fillStyle = css("--muted"); grid(x, W, y1 + PA + 4, H, true);
   playhead(x, W, H);
@@ -387,6 +436,68 @@ function drawTop5() {
   playhead(x, W, H);
 }
 
+// ---------- spectrogram ----------
+// As Praat's defaults: Gaussian window (the length chosen is the effective one, the window
+// spans twice that), autoscaled to the loudest point on screen, +6 dB/octave pre-emphasis
+// above 1 kHz. Computed for the view, one column per screen pixel.
+const SPEC = { win: 0.005, fmax: 5000, range: 50 }, SPEC_MAXVIEW = 60;
+let specCache = null, specBox = null;
+const fftPlans = {};
+function fftPlan(n) { if (fftPlans[n]) return fftPlans[n];
+  const bits = Math.log2(n), rev = new Uint32Array(n), cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < bits; b++) r |= ((i >> b) & 1) << (bits - 1 - b); rev[i] = r; }
+  for (let k = 0; k < n / 2; k++) { cos[k] = Math.cos(2 * Math.PI * k / n); sin[k] = -Math.sin(2 * Math.PI * k / n); }
+  return fftPlans[n] = { rev, cos, sin }; }
+function fft(re, im, p) { const n = re.length;
+  for (let i = 0; i < n; i++) { const j = p.rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let size = 2; size <= n; size <<= 1) { const half = size >> 1, step = n / size;
+    for (let i = 0; i < n; i += size) for (let k = 0; k < half; k++) {
+      const c = p.cos[k * step], s = p.sin[k * step], a = i + k, b = a + half;
+      const tr = re[b] * c - im[b] * s, ti = re[b] * s + im[b] * c;
+      re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti; } } }
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function spectrogram(cols, rows) {
+  const lowC = css("--panel"), highC = css("--ink");
+  const key = [v0, v1, cols, rows, SPEC.win, SPEC.fmax, SPEC.range, lowC, highC].join();
+  if (specCache && specCache.key === key) return specCache;
+  const N = Math.round(2 * SPEC.win * SR), NF = Math.max(512, 1 << Math.ceil(Math.log2(N))), plan = fftPlan(NF);
+  const w = new Float64Array(N), edge = Math.exp(-12), imid = (N - 1) / 2;
+  for (let i = 0; i < N; i++) w[i] = (Math.exp(-48 * (i - imid) ** 2 / (N + 1) ** 2) - edge) / (1 - edge);
+  const nb = NF / 2 + 1, gain = new Float64Array(nb);           // window normalisation and pre-emphasis
+  let ws = 0; for (let i = 0; i < N; i++) ws += w[i] * w[i];
+  for (let k = 0; k < nb; k++) gain[k] = -10 * Math.log10(ws) + 6 * Math.log2(Math.max(k, 1) * SR / NF / 1000);
+  const re = new Float64Array(NF), im = new Float64Array(NF), spec = new Float64Array(nb);
+  const db = new Float32Array(cols * rows).fill(NaN); let max = -Infinity;
+  for (let c = 0; c < cols; c++) {
+    const t = v0 + (c + 0.5) / cols * (v1 - v0); if (t < 0 || t > NS / SR) continue;
+    const s0 = Math.round(t * SR - imid); re.fill(0); im.fill(0);
+    for (let i = 0; i < N; i++) { const j = s0 + i; if (j >= 0 && j < NS) re[i] = sig[j] / 32768 * w[i]; }
+    fft(re, im, plan);
+    for (let k = 0; k < nb; k++) spec[k] = 10 * Math.log10(re[k] * re[k] + im[k] * im[k] + 1e-20) + gain[k];
+    for (let r = 0; r < rows; r++) { const f = (r + 0.5) / rows * SPEC.fmax * NF / SR, k = Math.floor(f), u = f - k;
+      const v = spec[k] * (1 - u) + spec[Math.min(nb - 1, k + 1)] * u; db[r * cols + c] = v; if (v > max) max = v; } }
+  const lo = hex(lowC), hi = hex(highC);
+  const im2 = img(cols, rows, px => { for (let r = 0; r < rows; r++) { const y = rows - 1 - r;
+    for (let c = 0; c < cols; c++) { const v = db[r * cols + c], o = (y * cols + c) * 4; if (v !== v) continue;
+      const a = Math.min(1, Math.max(0, (v - max + SPEC.range) / SPEC.range));
+      px[o] = lo[0] + (hi[0] - lo[0]) * a; px[o+1] = lo[1] + (hi[1] - lo[1]) * a; px[o+2] = lo[2] + (hi[2] - lo[2]) * a; px[o+3] = 255; } } });
+  return specCache = { key, img: im2, db, max, cols, rows };
+}
+// the level under the pointer, in dB below the loudest point on screen
+function specTip(rx, ry, W, ev) {
+  const b = specBox; if (!b || !b.sp || ry < b.top || ry >= b.top + b.h) return false;
+  const sp = b.sp, c = Math.min(sp.cols - 1, Math.floor(rx - GUT)), r = Math.min(sp.rows - 1, Math.floor((b.top + b.h - ry) / b.h * sp.rows));
+  const v = sp.db[r * sp.cols + c]; if (v !== v) return false;
+  tip.innerHTML = `<div class="t">${Tm(rx, W).toFixed(3)} s</div><div><b>${Math.round((r + 0.5) / sp.rows * SPEC.fmax)} Hz</b> · ` +
+    `${(v - sp.max).toFixed(0)} dB <span class="k">re the loudest point on screen</span></div>`;
+  tip.style.display = "block"; const tr = tip.getBoundingClientRect();
+  tip.style.left = Math.min(window.innerWidth - tr.width - 8, ev.clientX + 14) + "px";
+  tip.style.top = (ev.clientY + 16 + tr.height > window.innerHeight ? ev.clientY - tr.height - 10 : ev.clientY + 16) + "px";
+  return true; }
+for (const [id, k] of [["specwin", "win"], ["specmax", "fmax"], ["specrange", "range"]]) {
+  const el = document.getElementById(id); SPEC[k] = +el.value;
+  el.addEventListener("change", () => { SPEC[k] = +el.value; el.blur(); drawTiers(); }); }
+
 // ---------- reference ----------
 const refPhones = D.ref ? D.ref.phones.map(p => ({ s: p[0], e: p[1], ph: p[2], st: p[3] })) : [];
 if (D.ref) phones.forEach((p, j) => { p.st = D.ref.hyp_status[j]; p.ref = D.ref.hyp_ref[j]; });
@@ -462,6 +573,8 @@ for (const id of ["tiers", "att", "post", "top5"]) {
       if (drag.moved) { const dt = dx / (W - GUT) * (drag.b - drag.a); setView(drag.a - dt, drag.b - dt); }
       cv.style.cursor = "grabbing"; tip.style.display = "none"; return; }
     cv.style.cursor = rx > GUT ? "grab" : "default";
+    if (id === "tiers" && rx > GUT && specTip(rx, e.clientY - cv.getBoundingClientRect().top, W, e)) {
+      if (hover) { hover = null; drawTiers(); } return; }
     const p = rx > GUT ? phoneAt(Tm(rx, W)) : null;
     if (p !== hover) { hover = p; drawTiers(); } showTip(p, e);
   });

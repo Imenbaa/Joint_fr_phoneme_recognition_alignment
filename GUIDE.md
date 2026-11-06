@@ -123,7 +123,11 @@ also writes one web page per recording, and `index.html` listing them. Double-cl
 with how many phones each has and how many the model was unsure about. Click a name to see:
 
 - the **waveform** with the recognised **phones** and **pauses** under it; hover over a phone to
-  see its 5 candidates, click it to hear it;
+  see its 5 candidates, click it to hear it. Zoomed in to a few hundredths of a second, the
+  waveform shows the samples themselves;
+- the **spectrogram**, drawn for the part on screen, as in Praat (wideband 5 ms or narrowband
+  30 ms window, 0–5 or 0–8 kHz, darker = more energy), with the recognised boundaries (and, with
+  `--reference`, yours) over it; hover over it to read the frequency and the level;
 - the **attention** of the model: which phone each moment of the audio is attached to; the
   line is the path that gives the boundaries;
 - the **phone posteriors**: how probable every phone is at each moment;

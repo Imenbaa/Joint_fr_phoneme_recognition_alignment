@@ -14,7 +14,7 @@ Results go to a folder JointRecAlign/ next to the recordings, unless -o gives
 another folder. For each recording:
     <name>.TextGrid   tiers: phones, confidence, top2, top3, top4, top5, pauses
     <name>.csv        one row per phone: start, end, phone, top1..top5 and their probabilities
-    <name>.html       with --report: waveform, phones, attention, posteriors, top 5 (index.html lists them)
+    <name>.html       with --report: waveform, spectrogram, phones, attention, posteriors, top 5 (index.html lists them)
 and JointRecAlign.log, the summary of the run; with --reference, comparison.csv
 (PER, boundary F1, boundary errors, pause scores per recording and for the corpus;
 see jointrecalign/reference.py). The exit code is 1 when a recording could not be

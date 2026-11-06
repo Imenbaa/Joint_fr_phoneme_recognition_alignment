@@ -177,7 +177,7 @@ For each recording, in a folder `JointRecAlign/` next to the recording (or in `-
 |---|---|
 | `<name>.TextGrid` | Praat interval tiers, all covering the whole recording |
 | `<name>.csv` | one row per phone: `start`, `end`, `phone`, then `top1`, `p1` ... `top5`, `p5` |
-| `<name>.html` | with `--report`: waveform, phones and pauses, the aligner's attention with the alignment path, the CTC posteriors of every phone, the five candidates of each phone coloured by probability, on one time axis that scrolls and zooms; self-contained, no server (`index.html` lists the recordings) |
+| `<name>.html` | with `--report`: waveform, spectrogram, phones and pauses, the aligner's attention with the alignment path, the CTC posteriors of every phone, the five candidates of each phone coloured by probability, on one time axis that scrolls and zooms; self-contained, no server (`index.html` lists the recordings) |
 
 | tier | label of each interval |
 |---|---|
@@ -189,7 +189,7 @@ For each recording, in a folder `JointRecAlign/` next to the recording (or in `-
 | option | meaning |
 |---|---|
 | `-o folder` | where the results go (default: `JointRecAlign/` next to each recording) |
-| `--report` | also the HTML pages (about 0.6 MB per minute of audio) |
+| `--report` | also the HTML pages (about 3.5 MB per minute of audio) |
 | `--copy_audio` | with `--report`: copy each recording into `<results>/audio/`, so the pages still play it after the results folder is moved or copied to another computer |
 | `--model folder` | another model (default: the released one, downloaded the first time) |
 | `--symbols ipa` (default) / `model` | `ipa` writes the nasal vowels and œ in IPA (`ɑ̃ ɛ̃ ɔ̃ œ`); `model` keeps the model's one-character codes (`@ 1 § 9`) |
