@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "JointRecAlign"
-version = "0.1.1"
+version = "0.1.2"
 description = "Joint phone recognition and alignment with wav2vec2 (CTC + cross-attention aligner)"
 readme = "README.md"
 license = "MIT"
