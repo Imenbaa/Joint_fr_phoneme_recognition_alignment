@@ -283,6 +283,10 @@ if EVAL_MAX and len(eval_dataset) > EVAL_MAX:
         "dev utterances (--eval_max 0 for the full set).",
         flush=True,
     )
+# Eval batches are not grouped by length: sorted, each batch holds utterances of
+# similar length, so little zero padding. Padding shifts the GroupNorm statistics
+# of the first conv layer (feat_extract_norm="group"), which the mask cannot stop.
+eval_dataset = eval_dataset.sort("length")
 
 # =========================
 # Step 7: Data collator
@@ -331,18 +335,6 @@ data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
 print("Step 8: Metrics", flush=True)
 
 
-def preprocess_logits_for_metrics(logits, labels):
-    """Argmax on the GPU, per batch.
-
-    Without this the Trainer accumulates [n_utts, n_frames, vocab] float logits
-    across the whole dev set before compute_metrics ever runs — tens of GB moved
-    host-side each epoch, all of it discarded by the argmax below.
-    """
-    if isinstance(logits, tuple):
-        logits = logits[0]
-    return logits.argmax(dim=-1)
-
-
 def ctc_collapse(token_list):
     collapsed = []
     prev = None
@@ -361,19 +353,23 @@ def compute_metrics(pred):
     convert = processor.tokenizer.convert_ids_to_tokens
     pad_id = processor.tokenizer.pad_token_id
 
-    all_per = []
+    n_err, n_ref, utt_per = 0, 0, []
     for pred_id_seq, label_id_seq in zip(pred_ids, label_ids):
-        # -100 = the Trainer's padding when it stacks eval batches of different
-        # lengths; convert(-100) gives [UNK], which added one insertion per utterance.
+        # -100 = frames past the utterance's own length (CTCTrainer.prediction_step)
+        # and the Trainer's padding when it stacks eval batches; convert(-100) gives [UNK].
         pred_tokens = ctc_collapse([convert(int(i)) for i in pred_id_seq if i != -100])
         label_tokens = [
             convert(int(i)) for i in label_id_seq if i not in (-100, pad_id)
         ]
-        all_per.append(
-            editdistance.eval(pred_tokens, label_tokens) / max(1, len(label_tokens))
-        )
+        e = editdistance.eval(pred_tokens, label_tokens)
+        n_err += e
+        n_ref += len(label_tokens)
+        utt_per.append(e / max(1, len(label_tokens)))
 
-    return {"PER": float(np.mean(all_per))}
+    # PER = errors / reference phones over the whole set, as jointrecalign/reference.py.
+    # PER_utt_mean (mean of per-utterance PERs) is the metric before 2026-11-18: short
+    # utterances weigh as much as long ones.
+    return {"PER": n_err / max(1, n_ref), "PER_utt_mean": float(np.mean(utt_per))}
 
 
 # =========================
@@ -467,13 +463,37 @@ class CTCTrainer(Trainer):
     def _get_eval_sampler(self, eval_dataset):
         return None
 
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
+        """Argmax on the GPU, and -100 on the frames past each utterance's length.
+
+        Argmax here, per batch: otherwise the Trainer accumulates [n_utts, n_frames,
+        vocab] float logits over the whole dev set. The model outputs a logit for
+        every frame, padding included; without the cut, a non-blank argmax on a
+        padded frame counted as an insertion.
+        """
+        loss, logits, labels = super().prediction_step(
+            model, inputs, prediction_loss_only, ignore_keys=ignore_keys
+        )
+        if logits is None:
+            return loss, logits, labels
+        if isinstance(logits, tuple):
+            logits = logits[0]
+        ids = logits.argmax(dim=-1)
+        mask = inputs.get("attention_mask")
+        if mask is not None:
+            n_frames = self.accelerator.unwrap_model(model)._get_feat_extract_output_lengths(
+                mask.sum(-1)
+            ).to(ids.device)
+            past_end = torch.arange(ids.shape[1], device=ids.device)[None, :] >= n_frames[:, None]
+            ids = ids.masked_fill(past_end, -100)
+        return loss, ids, labels
+
 
 trainer = CTCTrainer(
     model=model,
     data_collator=data_collator,
     args=training_args,
     compute_metrics=compute_metrics,
-    preprocess_logits_for_metrics=preprocess_logits_for_metrics,
     train_dataset=dataset["train"],
     eval_dataset=eval_dataset,
 )
