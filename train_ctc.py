@@ -49,6 +49,9 @@ def parse_args():
     p.add_argument("--cache_dir", default=None,
                    help="Arrow map caches during preprocessing (default: system temp dir)")
     p.add_argument("--preprocess_only", action="store_true")
+    p.add_argument("--max_seconds", type=float, default=None,
+                   help="drop train/validation utterances longer than this at load time "
+                        "(the longest batch comes first with group_by_length); default: keep all")
     p.add_argument("--resume", action="store_true",
                    help="resume from the newest checkpoint in --output_dir")
     a = p.parse_args()
@@ -241,6 +244,15 @@ else:
 if PREPROCESS_ONLY:
     print("--preprocess_only: dataset written, exiting before training.", flush=True)
     sys.exit(0)
+
+if args.max_seconds:
+    _max_len = int(args.max_seconds * INPUT_SR)
+    for _split in ("train", "validation"):
+        if _split in dataset:
+            _n = len(dataset[_split])
+            dataset[_split] = dataset[_split].filter(lambda n: n <= _max_len, input_columns=["length"],
+                                                     num_proc=NUM_PROC)
+            print(f"--max_seconds {args.max_seconds:g}: {_split} {_n} -> {len(dataset[_split])}", flush=True)
 
 # =========================
 # Always load processor

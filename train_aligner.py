@@ -905,6 +905,8 @@ def parse_args():
     p.add_argument("--cache_dir", type=str, default=None)
     p.add_argument("--sampling_rate", type=int, default=16000)
     p.add_argument("--min_audio_seconds", type=float, default=1.5)
+    p.add_argument("--max_seconds", type=float, default=None,
+                   help="drop train/eval utterances longer than this at load time; default: keep all")
     p.add_argument("--min_phones", type=int, default=5)
     p.add_argument("--num_proc", type=int, default=6)
     # Model
@@ -1097,6 +1099,18 @@ def main():
 
     # 1) data
     dataset = build_or_load_dataset(args)
+    if args.max_seconds:
+        max_len = int(args.max_seconds * args.sampling_rate)
+        for split in ("train", args.eval_split):
+            if split in dataset:
+                n = len(dataset[split])
+                if "length" in dataset[split].column_names:
+                    dataset[split] = dataset[split].filter(lambda L: L <= max_len, input_columns=["length"],
+                                                           num_proc=args.num_proc)
+                else:
+                    dataset[split] = dataset[split].filter(lambda x: len(x) <= max_len,
+                                                           input_columns=["input_values"], num_proc=args.num_proc)
+                print(f"--max_seconds {args.max_seconds:g}: {split} {n} -> {len(dataset[split])}")
     train_ds = dataset["train"]
     if args.sil and args.sil_positions == "word":
         if not (args.sil_metadata_csv or args.audio_dir):
