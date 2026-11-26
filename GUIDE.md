@@ -197,6 +197,31 @@ model's (amber: different phone; red: phone only one of you has) and in red on t
   phones (noise, laughter...) can be left out with `--skip_labels noise,laugh`.
 - Your TextGrids are never modified.
 
+### When you know what was said: `align`
+
+`transcribe` recognises the phones itself. If you already know which phones were pronounced
+(read words, logatomes such as /wawa/, a hand-made transcription without boundaries), give them to
+the model and it only places the boundaries and the pauses (forced alignment):
+
+```
+JointRecAlign align my_recordings --phones my_phones
+```
+
+`my_phones` holds, for each recording, either a TextGrid with a phone tier (`ABC_01.TextGrid`,
+the times do not matter) or a text file with the phones separated by spaces (`ABC_01.txt`
+containing `w a w a`). The results are the same files as with `transcribe`, with exactly your
+phones in the `phones` tier.
+
+- Write the phones in IPA (`ɑ̃`, `ʁ`, `ʃ`...). `g`, `r` and `ʀ` are also accepted, and `ɥ` is read
+  as `y` (the model writes it so). For other symbols, write a small file `map.json`, e.g.
+  `{"a~": "ɑ̃", "H": "y"}`, and add `--phones_map map.json`; an unknown symbol stops that
+  recording with a message that lists it.
+- Pauses (`_`, `#`, `SIL`, empty intervals...) are left out: the model finds them itself.
+- The `confidence` and `top2`...`top5` tiers still give what the **model** hears inside each
+  phone. When they disagree with your phone (your phone is not the 1st candidate, or the 1st one is
+  far below 1), the model did not hear it there: check that place first.
+- `--report` and `--reference` work as with `transcribe`; `--phones_tier` chooses the tier.
+
 ### From Praat
 
 Install the Praat plugin once (in a Terminal / PowerShell window):

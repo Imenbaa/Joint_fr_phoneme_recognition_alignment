@@ -16,8 +16,12 @@
    (validate, default results folder, a damaged file among good ones, summary,
    log, HTML report, comparison with a reference TextGrid).
    Needs silero-vad (skipped without it).
-6. Model download on first use (from a local zip), then reuse of the cache.
-7. Praat plugin installation.
+6. Alignment of given phones: labels -> model tokens (IPA, aliases, user map,
+   unknown labels), the split of a given sequence over the chunks, the phone
+   files (.TextGrid, .txt); end to end with the tiny model: `JointRecAlign align`
+   gives exactly the given phones, in order, and refuses unknown or missing phones.
+7. Model download on first use (from a local zip), then reuse of the cache.
+8. Praat plugin installation.
 """
 import csv
 import json
@@ -292,6 +296,98 @@ def test_end_to_end():
     print(f"end to end ok ({len(phones)} phones, {len(pauses)} pauses)")
 
 
+class FakeTok:
+    pad_token, unk_token = "[PAD]", "[UNK]"
+
+    def __init__(self, symbols):
+        self.v = {"[PAD]": 0, "[UNK]": 1, **{x: i for i, x in enumerate(symbols, start=2)}}
+
+    def get_vocab(self):
+        return self.v
+
+
+def test_align_helpers():
+    from jointrecalign import reference as RF
+    tok = FakeTok(["a", "ɡ", "y", "ʁ", "@", "1", "9", "w"])
+    v = tok.get_vocab()
+    ids, bad = TR.target_ids(["a", "g", "ɥ", "r", "ɑ̃", "œ̃", "œ", "@", "w"], tok)
+    assert ids == [v[x] for x in ["a", "ɡ", "y", "ʁ", "@", "1", "9", "@", "w"]] and not bad, (ids, bad)
+    ids, bad = TR.target_ids(["a~", "x", "[PAD]", "a"], tok, {"a~": "ɑ̃"})
+    assert ids == [v["@"], v["a"]] and bad == ["x", "[PAD]"], (ids, bad)
+    # split over chunks: in order, every phone once; unmatched ones follow the phone before them
+    tgt = [5, 6, 7, 8, 9, 10]
+    assert TR.split_target(tgt, [[1, 2]]) == [tgt]
+    assert TR.split_target(tgt, [[5, 6, 7], [8, 9, 10]]) == [[5, 6, 7], [8, 9, 10]]
+    assert TR.split_target(tgt, [[5, 6], [], [7, 3, 9, 10]]) == [[5, 6], [], [7, 8, 9, 10]]
+    assert TR.split_target(tgt, [[], [2, 2], [5, 6, 7, 8, 9, 10]]) == [[], [], tgt]
+    assert TR.split_target(tgt, [[], [], []]) == [tgt, [], []]
+    for _ in range(200):
+        t = list(rng.integers(2, 8, int(rng.integers(1, 30))))
+        dec = [list(rng.integers(2, 8, int(rng.integers(0, 10)))) for _ in range(int(rng.integers(1, 5)))]
+        parts = TR.split_target(t, dec)
+        assert len(parts) == len(dec) and sum(parts, []) == t, (t, dec, parts)
+    with tempfile.TemporaryDirectory() as d:
+        open(f"{d}/x.txt", "w", encoding="utf-8").write("w a w a\n_ j u j u\n")
+        open(f"{d}/y.TXT", "w", encoding="utf-8").write("a")
+        assert RF.find_phones("/r/x.wav", d) == f"{d}/x.txt" and RF.find_phones("/r/y.flac", d) == f"{d}/y.TXT"
+        assert RF.load_phones(f"{d}/x.txt") == "w a w a j u j u".split()
+        TR.write_textgrid(f"{d}/x.TextGrid", [{"phone": "b", "start": 0.1, "end": 0.2, "cands": []},
+                                             {"phone": "ɔ̃", "start": 0.2, "end": 0.4, "cands": []}],
+                          [(0.4, 1.0)], 1.0)
+        assert RF.find_phones("/r/x.wav", d) == f"{d}/x.TextGrid"            # TextGrid first
+        assert RF.load_phones(f"{d}/x.TextGrid") == ["b", "ɔ̃"]
+        assert RF.find_phones("/r/z.wav", d) is None
+    print("align helpers ok")
+
+
+def test_align_end_to_end():
+    try:
+        import silero_vad  # noqa: F401
+    except ImportError:
+        print("align end to end SKIPPED (pip install silero-vad)")
+        return
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with tempfile.TemporaryDirectory() as d:
+        tiny_model_dir(f"{d}/model")
+        t = np.arange(int(25 * SR)) / SR
+        x = 0.002 * rng.standard_normal(len(t))
+        for s in np.arange(0.5, 24.0, 2.5):
+            on = (t >= s) & (t < s + 1.8)
+            x[on] += 0.3 * np.sin(2 * np.pi * 180 * t[on]) * rng.uniform(0.5, 1, on.sum())
+        os.makedirs(f"{d}/rec")
+        sf.write(f"{d}/rec/long.wav", x.astype(np.float32), SR)              # several chunks
+        sf.write(f"{d}/rec/short.wav", x[:3 * SR].astype(np.float32), SR)    # one chunk
+        sf.write(f"{d}/rec/odd.wav", x[:3 * SR].astype(np.float32), SR)
+        sf.write(f"{d}/rec/none.wav", x[:3 * SR].astype(np.float32), SR)
+        os.makedirs(f"{d}/ph")
+        given = ("b a l e m ɑ̃ _ k o d i " * 6).split()
+        open(f"{d}/ph/long.txt", "w", encoding="utf-8").write(" ".join(given))
+        open(f"{d}/ph/short.txt", "w", encoding="utf-8").write("l a m o d ə")
+        open(f"{d}/ph/odd.txt", "w", encoding="utf-8").write("a zz a")
+        r = subprocess.run([sys.executable, "-m", "jointrecalign", "align", "--model", f"{d}/model", "--device", "cpu",
+                            "--phones", f"{d}/ph", "--phones_map", f"{d}/map.json", "--report", "-o", f"{d}/out",
+                            f"{d}/rec"], capture_output=True, text=True, cwd=root, input="")
+        assert r.returncode != 0                                          # map.json missing
+        json.dump({"ə": "e"}, open(f"{d}/map.json", "w", encoding="utf-8"))
+        r = subprocess.run([sys.executable, "-m", "jointrecalign", "align", "--model", f"{d}/model", "--device", "cpu",
+                            "--phones", f"{d}/ph", "--phones_map", f"{d}/map.json", "--report", "-o", f"{d}/out",
+                            f"{d}/rec"], capture_output=True, text=True, cwd=root)
+        out = r.stdout
+        assert r.returncode == 1, out + r.stderr
+        assert "none.wav: no none.TextGrid or none.txt" in out, out
+        assert "odd: FAILED (phones that the model does not know: 'zz' (1)" in out, out
+        assert "4 recordings: 2 aligned, 2 NOT aligned" in out, out
+        for name, want in (("long", [p for p in given if p != "_"]), ("short", "l a m o d e".split())):
+            _, tiers = read_textgrid(f"{d}/out/{name}.TextGrid")
+            got = [x for _, _, x in tiers["phones"] if x]
+            assert got == want, (name, got, want)
+            rows = list(csv.DictReader(open(f"{d}/out/{name}.csv", encoding="utf-8")))
+            assert [r_["phone"] for r_ in rows] == want and all(r_["top1"] for r_ in rows)
+            assert all(float(a["end"]) <= float(b["start"]) + 1e-6 for a, b in zip(rows[:-1], rows[1:]))
+            assert os.path.exists(f"{d}/out/{name}.html")
+    print("align end to end ok")
+
+
 def test_download():
     """First use: the model zip is fetched, unzipped into the cache, then reused."""
     import zipfile
@@ -350,6 +446,8 @@ if __name__ == "__main__":
     test_candidates()
     test_writers()
     test_end_to_end()
+    test_align_helpers()
+    test_align_end_to_end()
     test_download()
     test_praat_plugin()
     print("ALL OK")

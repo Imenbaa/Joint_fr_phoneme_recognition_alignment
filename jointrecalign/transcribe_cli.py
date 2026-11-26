@@ -1,5 +1,6 @@
 """JointRecAlign: phones, boundaries, pauses and the top-5 candidates of each phone
-of French recordings, as Praat TextGrids. No transcript is needed.
+of French recordings, as Praat TextGrids. No transcript is needed; with `align`,
+the phones you give are aligned instead of the recognised ones.
 
     JointRecAlign validate recordings/              check the audio files, without the model
     JointRecAlign transcribe recordings/ [-o out/]  check, then transcribe
@@ -7,6 +8,9 @@ of French recordings, as Praat TextGrids. No transcript is needed.
                                   [--copy_audio]    ... playing a copy of the recording in out/audio/
     JointRecAlign transcribe recordings/ --reference textgrids/
                                                     compare with reference phone TextGrids
+    JointRecAlign align recordings/ --phones phones/
+                                                    align your phones: <name>.TextGrid (a phone tier)
+                                                    or <name>.txt (phones separated by spaces)
     JointRecAlign download                          download the model now (else: on first use)
     JointRecAlign install-praat-plugin              a "JointRecAlign: transcribe..." button in Praat
 
@@ -37,7 +41,7 @@ import warnings
 
 AUDIO = (".wav", ".flac", ".mp3", ".ogg", ".aiff", ".aif")
 OUT_NAME = "JointRecAlign"
-COMMANDS = ("validate", "transcribe", "download", "install-praat-plugin")
+COMMANDS = ("validate", "transcribe", "align", "download", "install-praat-plugin")
 
 
 def find_audio(inputs):
@@ -126,9 +130,25 @@ def check_reference(path, out_dir, ref):
     return out
 
 
-def validate(files, out_dir=None, log=print, ref=None):
-    """Check every file (and its reference TextGrid, with ref); -> {path: [(level, message)]}
-    for the files with a problem."""
+def check_phones(path, out_dir, ph):
+    """-> [(level, message)] about the phones to align for a recording (ph: the --phones options)."""
+    from . import reference as RF
+    name = os.path.splitext(os.path.basename(path))[0]
+    pp = RF.find_phones(path, ph["folder"])
+    if pp is None:
+        return [("error", f"no {name}.TextGrid or {name}.txt in {ph['folder']}: nothing to align")]
+    if os.path.abspath(pp) == os.path.abspath(os.path.join(out_dir_for(path, out_dir), name + ".TextGrid")):
+        return [("error", f"the results would overwrite the phones {pp}: choose another -o")]
+    try:
+        labels = RF.load_phones(pp, ph["tier"], ph["pause_labels"], ph["skip_labels"])
+    except Exception as e:
+        return [("error", f"phones {pp} not usable ({e})")]
+    return [] if labels else [("error", f"no phone in {pp}")]
+
+
+def validate(files, out_dir=None, log=print, ref=None, ph=None):
+    """Check every file (and its reference TextGrid, with ref; its phones to align, with ph);
+    -> {path: [(level, message)]} for the files with a problem."""
     issues, seen, can_write = {}, {}, {}
     for path in files:
         found = check_file(path)
@@ -138,6 +158,8 @@ def validate(files, out_dir=None, log=print, ref=None):
         if not can_write[d]:
             found.append(("error", f"no permission to write the results in {d}: "
                                    "choose a results folder with -o, e.g. -o ~/JointRecAlign_results"))
+        if ph and not any(lv == "error" for lv, _ in found):
+            found += check_phones(path, out_dir, ph)
         if ref and not any(lv == "error" for lv, _ in found):
             found += check_reference(path, out_dir, ref)
         key = (d, os.path.splitext(os.path.basename(path))[0].lower())
@@ -153,7 +175,7 @@ def validate(files, out_dir=None, log=print, ref=None):
     for path, found in issues.items():
         for level, msg in found:
             log(f"  {level.upper():7s} {path}: {msg}")
-    log(f"Checked {len(files)} recordings: {len(files) - n_err} can be transcribed"
+    log(f"Checked {len(files)} recordings: {len(files) - n_err} can be {'aligned' if ph else 'transcribed'}"
         + (f", {n_err} cannot" if n_err else "") + (f", {n_warn} warnings" if n_warn else ""))
     return issues
 
@@ -179,10 +201,11 @@ class Log:
 
 
 def run(files, out_dir=None, model=None, symbols="ipa", phone_map=None, max_chunk=10.0, device=None,
-        log=print, vocab_path=None, report=False, rejected=(), ref=None, copy_audio=False):
+        log=print, vocab_path=None, report=False, rejected=(), ref=None, copy_audio=False, ph=None):
     """Transcribe the files; one failing file does not stop the others. rejected: [(file, reason)]
     refused before (listed in the report index); ref: the --reference options; copy_audio: the
-    report pages play a copy of each recording in <results>/audio/.
+    report pages play a copy of each recording in <results>/audio/; ph: the --phones options
+    (align the given phones in place of the recognised ones).
     -> (written TextGrids, failures [(file, reason)], comparison counts [(file, counts)],
         reference labels outside the model's phones {label: count})."""
     # transcription never goes online: the model loads from a local folder (download.py fetches it, once,
@@ -203,8 +226,8 @@ def run(files, out_dir=None, model=None, symbols="ipa", phone_map=None, max_chun
     m, fe, tok, dev = TR.load_model(model, vocab_path, device)
     log(f"Running on {'the GPU' if dev == 'cuda' else 'the CPU'}")
     done, failed, pages, compared, unknown = [], [], {}, [], {}
+    from . import reference as RF
     if ref:
-        from . import reference as RF
         from .report import vocab_rows
         known = {l for _, l in vocab_rows(tok, symbol_map)[0][1:]} | {symbol_map.get(v, v) for v in TR.E.HYP_FIX.values()}
     for i, path in enumerate(files, 1):
@@ -213,7 +236,15 @@ def run(files, out_dir=None, model=None, symbols="ipa", phone_map=None, max_chun
         d = out_dir_for(path, out_dir)
         try:
             trace = [] if report else None
-            phones, pauses, dur = TR.transcribe(path, m, fe, tok, dev, max_chunk, symbol_map, trace)
+            target = None
+            if ph:
+                labels = RF.load_phones(RF.find_phones(path, ph["folder"]), ph["tier"], ph["pause_labels"],
+                                        ph["skip_labels"])
+                target, bad = TR.target_ids(labels, tok, ph["map"])
+                if bad:
+                    top = ", ".join(f"{k!r} ({bad.count(k)})" for k in sorted(set(bad), key=lambda k: -bad.count(k))[:12])
+                    raise ValueError(f"phones that the model does not know: {top}; map them with --phones_map")
+            phones, pauses, dur = TR.transcribe(path, m, fe, tok, dev, max_chunk, symbol_map, trace, target)
             os.makedirs(d, exist_ok=True)
             tg = os.path.join(d, name + ".TextGrid")
             TR.write_textgrid(tg, phones, pauses, dur)
@@ -283,8 +314,11 @@ def transcribe_command(a, log):
         log("No audio file to transcribe.")
         return 1
     ref = ref_options(a)
-    log(f"Checking {len(files)} recordings" + (f" and their reference TextGrids in {a.reference}" if ref else ""))
-    issues = validate(files, a.out_dir, log, ref)
+    ph = phones_options(a)
+    verb = "aligned" if ph else "transcribed"
+    log(f"Checking {len(files)} recordings" + (f", their phones in {a.phones}" if ph else "")
+        + (f" and their reference TextGrids in {a.reference}" if ref else ""))
+    issues = validate(files, a.out_dir, log, ref, ph)
     bad = {p for p, v in issues.items() if any(lv == "error" for lv, _ in v)}
     todo = [p for p in files if p not in bad]
     rejected = [(p, "; ".join(m for lv, m in issues[p] if lv == "error")) for p in files if p in bad]
@@ -293,14 +327,14 @@ def transcribe_command(a, log):
         t = time.time()
         done, failed, compared, unknown = run(todo, a.out_dir, a.model, a.symbols, a.phone_map, a.max_chunk,
                                               a.device, log, a.vocab_path, a.report, rejected, ref,
-                                              a.copy_audio)
+                                              a.copy_audio, ph)
         log(f"Time: {time.time() - t:.0f} s")
     failed = rejected + failed
     log("")
     log("Summary")
-    log(f"  {len(files)} recordings: {len(done)} transcribed" + (f", {len(failed)} NOT transcribed" if failed else ""))
+    log(f"  {len(files)} recordings: {len(done)} {verb}" + (f", {len(failed)} NOT {verb}" if failed else ""))
     for p, why in failed:
-        log(f"  not transcribed: {p}: {why}")
+        log(f"  not {verb}: {p}: {why}")
     for p, v in issues.items():
         for lv, msg in v:
             if lv == "warning":
@@ -308,7 +342,7 @@ def transcribe_command(a, log):
     if ref:
         from . import reference as RF
         s = RF.scores([c for _, c in compared]) if compared else None
-        log(f"  compared with the reference: {len(compared)} of {len(done)} transcribed recordings")
+        log(f"  compared with the reference: {len(compared)} of {len(done)} {verb} recordings")
         if s:
             log(f"    PER {_pc(s['PER'])} ({s['S']} substitutions, {s['D']} deletions, {s['I']} insertions, "
                 f"{s['n_ref']} reference phones)")
@@ -343,16 +377,40 @@ def ref_options(a):
             "skip_labels": split(a.skip_labels) if a.skip_labels else ()}
 
 
+def phones_options(a):
+    """The --phones options (align) as a dict, or None."""
+    if not getattr(a, "phones", None):
+        return None
+    from . import reference as RF
+    if not os.path.isdir(a.phones):
+        raise ValueError(f"phones folder not found: {a.phones}")
+    split = lambda s: [x.strip() for x in s.split(",") if x.strip()]
+    return {"folder": a.phones, "tier": a.phones_tier, "map": RF.load_map(a.phones_map),
+            "pause_labels": split(a.pause_labels) if a.pause_labels is not None else RF.PAUSE_LABELS,
+            "skip_labels": split(a.skip_labels) if a.skip_labels else ()}
+
+
 def parser():
     ap = argparse.ArgumentParser(prog="JointRecAlign", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", metavar="command")
     for name, help_ in (("validate", "check the audio files (readable, duration, sampling rate, clipping...)"),
-                        ("transcribe", "check, then transcribe the recordings")):
+                        ("transcribe", "check, then transcribe the recordings"),
+                        ("align", "check, then align the phones you give (forced alignment)")):
         p = sub.add_parser(name, help=help_, description=help_)
         p.add_argument("inputs", nargs="+", help="audio files or folders of audio files")
         p.add_argument("-o", "--out_dir", default=None,
                        help=f"folder for the results (default: a folder {OUT_NAME}/ next to each recording)")
+        if name == "align":
+            g = p.add_argument_group("phones to align")
+            g.add_argument("--phones", required=True, metavar="FOLDER",
+                           help="folder with, for <name>.wav, <name>.TextGrid (a phone tier) or <name>.txt "
+                                "(phones separated by spaces, e.g. w a w a)")
+            g.add_argument("--phones_tier", default=None,
+                           help="tier of the phones in the TextGrids (default: phones / phonemes / ..., else the first)")
+            g.add_argument("--phones_map", default=None, metavar="JSON",
+                           help='JSON {"your label": "model phone"}, e.g. {"a~": "ɑ̃", "H": "y"}; '
+                                "g, ɥ (-> y), œ̃ (-> ɛ̃), r and ʀ (-> ʁ) are read without it")
         g = p.add_argument_group("comparison with a reference (see jointrecalign/reference.py)")
         g.add_argument("--reference", default=None, metavar="FOLDER",
                        help="folder of the reference phone TextGrids, <name>.TextGrid for <name>.wav")
@@ -362,9 +420,11 @@ def parser():
                        help='JSON {"reference label": "model phone"}, e.g. {"ø": "ə"} or {"a~": "ɑ̃"}')
         g.add_argument("--pause_labels", default=None,
                        help="comma-separated labels that mean a pause, besides empty intervals "
-                            "(default: SIL, sil, sp, spn, _, #, <p:>, ...)")
+                            "(default: SIL, sil, sp, spn, _, #, <p:>, ...)"
+                            + ("; also left out of the phones to align" if name == "align" else ""))
         g.add_argument("--skip_labels", default=None,
-                       help="comma-separated labels left out of the comparison (noise, overlap...)")
+                       help="comma-separated labels left out of the comparison (noise, overlap...)"
+                            + (" and of the phones to align" if name == "align" else ""))
         if name == "validate":
             continue
         p.add_argument("--report", action="store_true",

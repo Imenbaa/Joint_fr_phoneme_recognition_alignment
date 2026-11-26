@@ -83,6 +83,29 @@ def find_reference(audio_path, folder):
     return None
 
 
+def find_phones(audio_path, folder):
+    """The phones to align for a recording: <folder>/<name>.TextGrid, else <folder>/<name>.txt
+    (any case of the extension), or None."""
+    name = os.path.splitext(os.path.basename(audio_path))[0]
+    if not os.path.isdir(folder):
+        return None
+    found = {}
+    for f in os.listdir(folder):
+        stem, ext = os.path.splitext(f)
+        if stem == name and ext.lower() in (".textgrid", ".txt"):
+            found[ext.lower()] = os.path.join(folder, f)
+    return found.get(".textgrid") or found.get(".txt")
+
+
+def load_phones(path, tier=None, pause_labels=PAUSE_LABELS, skip_labels=()):
+    """The phone labels of a TextGrid tier (as load_reference: pauses and skipped labels left
+    out) or of a text file (phones separated by spaces or new lines; pause labels left out)."""
+    if path.lower().endswith(".txt"):
+        drop = set(pause_labels) | set(skip_labels)
+        return [x for x in _text(path).split() if x not in drop]
+    return [p["phone"] for p in load_reference(path, tier, None, pause_labels, skip_labels)["phones"]]
+
+
 def pick_tier(tiers, name=None):
     if name:
         if name not in tiers:

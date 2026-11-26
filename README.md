@@ -149,6 +149,7 @@ JointRecAlign validate recordings_folder/                 # check the audio file
 JointRecAlign transcribe recordings_folder/ [-o out/]     # check, then transcribe
 JointRecAlign transcribe recordings_folder/ --report      # + one HTML page per recording, index.html
 JointRecAlign transcribe recordings_folder/ --reference textgrids/   # + comparison with reference TextGrids
+JointRecAlign align recordings_folder/ --phones phones_folder/        # forced alignment of your phones
 JointRecAlign install-praat-plugin                        # a "JointRecAlign: transcribe..." button for Sounds in Praat
 ```
 
@@ -197,6 +198,15 @@ For each recording, in a folder `JointRecAlign/` next to the recording (or in `-
 | `--max_chunk 10` | longest piece of audio the model sees at once, in seconds |
 | `--vocab_path` | phone vocabulary (default: `vocab.json` in the checkpoint) |
 | `--device cuda` / `cpu` | default: `cuda` when available |
+
+**Forced alignment.** `align` takes the phones from `--phones folder`: `<name>.TextGrid` (a phone
+tier, `--phones_tier`; its times are not used) or `<name>.txt` (phones separated by white space),
+and aligns them in place of the CTC decode, with the same SIL-Viterbi decode (boundaries and
+pauses) and the same outputs. Labels are read as IPA or model symbols, plus `g`, `r`, `ʀ`, `ɥ`
+(-> `y`), `œ̃` (-> `ɛ̃`); `--phones_map map.json` maps the others; pause labels are dropped. The
+candidate tiers remain the CTC posteriors inside each aligned phone, so they show where the model
+hears something else. A recording longer than `--max_chunk` is decoded chunk by chunk first, and
+each given phone goes to the chunk of the decoded phone it matches (edit-distance alignment).
 
 **Comparison with a reference** (`--reference FOLDER`, `jointrecalign/reference.py`): for
 `<name>.wav`, the phone tier of `FOLDER/<name>.TextGrid` (`--ref_tier`, default the tier named
