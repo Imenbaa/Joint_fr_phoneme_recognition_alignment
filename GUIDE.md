@@ -65,6 +65,30 @@ The model is stored in a cache folder (`~/Library/Caches/JointRecAlign` on a Mac
 `%LOCALAPPDATA%\JointRecAlign` on Windows, `~/.cache/JointRecAlign` on Linux). If you skip
 this step, it is downloaded the first time you transcribe.
 
+### Using an NVIDIA graphics card on Windows
+
+The program works without a graphics card; with an NVIDIA card it is several times faster. When
+you transcribe, the first lines say `Running on the GPU` or `Running on the CPU`. If your computer
+has an NVIDIA card and it says `the CPU`, `--torch-backend auto` did not pick the version of PyTorch
+that uses the card. Install it explicitly, in PowerShell:
+
+```
+uv tool install --force --torch-backend cu128 --python 3.12 --with torch==2.9.0 --with torchaudio==2.9.0 JointRecAlign
+```
+
+`cu128` is the PyTorch build for CUDA 12.8. It works with recent cards, including the RTX 50 series,
+which need it; it needs an up-to-date NVIDIA driver (update it with the NVIDIA app if needed).
+This download is larger (a few GB).
+
+To check that the card is used, paste:
+
+```
+& "$env:APPDATA\uv\tools\jointrecalign\Scripts\python.exe" -c "import torch, torchaudio; print(torch.__version__, torchaudio.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no GPU')"
+```
+
+It should print `True` and the name of your card. If it prints `False`, update the NVIDIA driver
+and run the install line again.
+
 ## 2. Transcribe recordings
 
 Open a Terminal / PowerShell window. Type `JointRecAlign transcribe`, a space, then **drag the
